@@ -21,18 +21,26 @@ async function run() {
     const productsCollection = client
       .db("made_in_china")
       .collection("products");
-
+    const ordersCollection = client.db("made_in_china").collection("orders");
+    // get all product
     app.get("/products", async (req, res) => {
       const query = {};
       const cursor = productsCollection.find(query);
       const products = await cursor.toArray();
       res.send(products);
     });
+    // get single product
     app.get("/checkout/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: ObjectId(id) };
       const product = await productsCollection.findOne(query);
       res.send(product);
+    });
+    // post single order
+    app.post("/orders", async (req, res) => {
+      const order = req.body;
+      const result = await ordersCollection.insertOne(order);
+      res.send(result);
     });
   } finally {
   }

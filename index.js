@@ -22,6 +22,7 @@ async function run() {
       .db("made_in_china")
       .collection("products");
     const ordersCollection = client.db("made_in_china").collection("orders");
+    const usersCollection = client.db("made_in_china").collection("users");
     // get all product
     app.get("/products", async (req, res) => {
       const query = {};
@@ -41,6 +42,38 @@ async function run() {
       const order = req.body;
       const result = await ordersCollection.insertOne(order);
       res.send(result);
+    });
+    // get single order
+    app.get("/myorders", async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      console.log("query email :", query);
+      const cursor = ordersCollection.find(query);
+      const myOrders = await cursor.toArray();
+      res.send(myOrders);
+      // delete single order
+      app.delete("/orders/:id", async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: ObjectId(id) };
+        const result = await ordersCollection.deleteOne(query);
+        res.send(result);
+      });
+      // add user client to database
+      app.put("/users/:email", async (req, res) => {
+        const email = req.params.email;
+        const user = req.body;
+        const filter = { email: email };
+        const options = { upsert: true };
+        const updateDoc = {
+          $set: user,
+        };
+        const result = await usersCollection.updateOne(
+          filter,
+          updateDoc,
+          options
+        );
+        res.send(result);
+      });
     });
   } finally {
   }

@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 const app = express();
@@ -47,7 +48,6 @@ async function run() {
     app.get("/myorders", async (req, res) => {
       const email = req.query.email;
       const query = { email: email };
-      console.log("query email :", query);
       const cursor = ordersCollection.find(query);
       const myOrders = await cursor.toArray();
       res.send(myOrders);
@@ -59,21 +59,26 @@ async function run() {
         res.send(result);
       });
       // add user client to database
-      app.put("/users/:email", async (req, res) => {
-        const email = req.params.email;
-        const user = req.body;
-        const filter = { email: email };
-        const options = { upsert: true };
-        const updateDoc = {
-          $set: user,
-        };
-        const result = await usersCollection.updateOne(
-          filter,
-          updateDoc,
-          options
-        );
-        res.send(result);
+    });
+    app.put("/user/:email", async (req, res) => {
+      const email = req.params.email;
+      const user = req.body;
+      console.log(email, user);
+      const filter = { email: email };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: user,
+      };
+      const result = await usersCollection.updateOne(
+        filter,
+        updateDoc,
+        options
+      );
+      const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN, {
+        expiresIn: "18h",
       });
+
+      res.send({ result, token });
     });
   } finally {
   }

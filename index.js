@@ -16,6 +16,21 @@ const client = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
+function verifyJWT(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send({ message: "UnAuthorized access" });
+  }
+  const token = authHeader.split(" ")[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
+    if (err) {
+      return res.status(403).send({ message: "Forbidden access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+}
+
 async function run() {
   try {
     await client.connect();
@@ -45,21 +60,26 @@ async function run() {
       res.send(result);
     });
     // get single order
-    app.get("/myorders", async (req, res) => {
+    app.get("/myorders", verifyJWT, async (req, res) => {
       const email = req.query.email;
-      const query = { email: email };
-      const cursor = ordersCollection.find(query);
-      const myOrders = await cursor.toArray();
-      res.send(myOrders);
-      // delete single order
-      app.delete("/orders/:id", async (req, res) => {
-        const id = req.params.id;
-        const query = { _id: ObjectId(id) };
-        const result = await ordersCollection.deleteOne(query);
-        res.send(result);
-      });
-      // add user client to database
+      const decodedEmail = req.decoded.email;
+      if (email === decodedEmail) {
+        const query = { email: email };
+        const cursor = ordersCollection.find(query);
+        const myOrders = await cursor.toArray();
+        return res.send(myOrders);
+      } else {
+        return res.status(403).send({ message: "forbidden access" });
+      }
     });
+    // delete single order
+    app.delete("/orders/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await ordersCollection.deleteOne(query);
+      res.send(result);
+    });
+    // add user client to database
     app.put("/user/:email", async (req, res) => {
       const email = req.params.email;
       const user = req.body;
@@ -79,6 +99,10 @@ async function run() {
       });
 
       res.send({ result, token });
+    });
+    app.get("/user", async (req, res) => {
+      const users = await usersCollection.find().toArray();
+      res.send(users);
     });
   } finally {
   }

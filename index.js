@@ -32,17 +32,6 @@ function verifyJWT(req, res, next) {
   });
 }
 
-// verify admin
-const verifyAdmin = async (req, res, next) => {
-  const requester = req.decoded.email;
-  const requesterAccount = await userCollection.findOne({ email: requester });
-  if (requesterAccount.role === "admin") {
-    next();
-  } else {
-    res.status(403).send({ message: "forbidden" });
-  }
-};
-
 async function run() {
   try {
     await client.connect();
@@ -51,12 +40,30 @@ async function run() {
       .collection("products");
     const ordersCollection = client.db("made_in_china").collection("orders");
     const usersCollection = client.db("made_in_china").collection("users");
+    // verifyAdmin
+    const verifyAdmin = async (req, res, next) => {
+      const requester = req.decoded.email;
+      const requesterAccount = await usersCollection.findOne({
+        email: requester,
+      });
+      if (requesterAccount.role === "admin") {
+        next();
+      } else {
+        res.status(403).send({ message: "forbidden" });
+      }
+    };
     // get all product
     app.get("/products", async (req, res) => {
       const query = {};
       const cursor = productsCollection.find(query);
       const products = await cursor.toArray();
       res.send(products);
+    });
+    // add single product
+    app.post("/product", verifyJWT, verifyAdmin, async (req, res) => {
+      const product = req.body;
+      const result = await productsCollection.insertOne(product);
+      res.send(result);
     });
     // get single product
     app.get("/checkout/:id", async (req, res) => {
@@ -107,7 +114,7 @@ async function run() {
         options
       );
       const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN, {
-        expiresIn: "18h",
+        expiresIn: "30d",
       });
 
       res.send({ result, token });
@@ -118,22 +125,14 @@ async function run() {
       res.send(users);
     });
     // make admin
-    app.put("/user/admin/:email", verifyJWT, async (req, res) => {
+    app.put("/user/admin/:email", verifyJWT, verifyAdmin, async (req, res) => {
       const email = req.params.email;
-      const requester = req.decoded.email;
-      const requesterAccount = await usersCollection.findOne({
-        email: requester,
-      });
-      if (requesterAccount.role === "admin") {
-        const filter = { email: email };
-        const updateDoc = {
-          $set: { role: "admin" },
-        };
-        const result = await usersCollection.updateOne(filter, updateDoc);
-        res.send(result);
-      } else {
-        res.status(403).send({ message: "forbidden access" });
-      }
+      const filter = { email: email };
+      const updateDoc = {
+        $set: { role: "admin" },
+      };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
     });
     // check admin
     app.get("/admin/:email", async (req, res) => {
